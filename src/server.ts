@@ -13,6 +13,31 @@ const server = new McpServer({
   },
 });
 
+server.registerResource(
+  "users",
+  "users://all",
+  {
+    title: "users",
+    description: "get all users from the DB",
+    mimeType: "application/json",
+  },
+  async (uri) => {
+    const users = await import("./data/users.json", {
+      with: { type: "json" },
+    }).then((m) => m.default);
+
+    return {
+      contents: [
+        {
+          uri: uri.href,
+          text: JSON.stringify(users),
+          mimeType: "application/json",
+        },
+      ],
+    };
+  }
+);
+
 server.registerTool(
   "create-user",
   {
