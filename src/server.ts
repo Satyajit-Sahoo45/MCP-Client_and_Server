@@ -117,6 +117,30 @@ server.registerTool(
   }
 );
 
+server.registerPrompt(
+  "generate-fake-user",
+  {
+    title: "Generate Fake User",
+    description: "Generate a fake user based on a given name",
+    argsSchema: {
+      name: z.string(),
+    },
+  },
+  ({ name }) => {
+    return {
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `Generate a fake user with the name ${name}. The user should have a realistic email, address, and phone number.`,
+          },
+        },
+      ],
+    };
+  }
+);
+
 async function createUser(user: {
   name: string;
   email: string;
