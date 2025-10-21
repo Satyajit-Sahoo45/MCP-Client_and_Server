@@ -5,6 +5,7 @@ import {
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import fs from "node:fs/promises";
+import { completable } from "@modelcontextprotocol/sdk/server/completable.js";
 
 const server = new McpServer({
   name: "test",
@@ -139,6 +140,46 @@ server.registerPrompt(
       ],
     };
   }
+);
+
+// Prompt with context-aware completion
+server.registerPrompt(
+  "user-greeting",
+  {
+    title: "User Greeting",
+    description: "Generate a greeting for user members",
+    argsSchema: {
+      department: completable(z.string(), (value) => {
+        // Department suggestions
+        return ["engineering", "sales", "marketing", "support"].filter((d) =>
+          d.startsWith(value)
+        );
+      }),
+      name: completable(z.string(), (value, context) => {
+        // Name suggestions based on selected department
+        const department = context?.arguments?.["department"];
+        if (department === "engineering") {
+          return ["Alice", "Bob", "Charlie"].filter((n) => n.startsWith(value));
+        } else if (department === "sales") {
+          return ["David", "Eve", "Frank"].filter((n) => n.startsWith(value));
+        } else if (department === "marketing") {
+          return ["Grace", "Henry", "Iris"].filter((n) => n.startsWith(value));
+        }
+        return ["Guest"].filter((n) => n.startsWith(value));
+      }),
+    },
+  },
+  ({ department, name }) => ({
+    messages: [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Hello ${name}, welcome to the ${department}! Department`,
+        },
+      },
+    ],
+  })
 );
 
 async function createUser(user: {
