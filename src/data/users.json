@@ -95,5 +95,18 @@
     "email": "john.doe@example.com",
     "address": "123 Main Street, Anytown, ST 12345",
     "phone": "555-123-4567"
+  },
+  {
+    "id": 14,
+    "name": "Daniela Reed",
+    "email": "daniela.reed@example.com",
+    "address": {
+      "street": "2148 Birchwood Lane",
+      "city": "Seattle",
+      "state": "WA",
+      "zip": "98109",
+      "country": "USA"
+    },
+    "phone": "+1-206-555-0147"
   }
 ]
