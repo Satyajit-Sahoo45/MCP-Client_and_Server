@@ -250,9 +250,12 @@ async function createUser(user: {
   address: string;
   phone: string;
 }) {
-  const users = await import("./data/users.json", {
-    with: { type: "json" },
-  }).then((m) => m.default);
+  // const users = await import("./data/users.json", {
+  //   with: { type: "json" },
+  // }).then((m) => m.default);
+
+  const data = await fs.readFile("./src/data/users.json", "utf-8");
+  const users = JSON.parse(data);
 
   const id = users.length + 1;
 
