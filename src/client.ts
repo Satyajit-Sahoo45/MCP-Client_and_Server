@@ -1,7 +1,17 @@
-import { input, select } from "@inquirer/prompts";
+import { config } from "dotenv";
+import { confirm, input, select } from "@inquirer/prompts";
 import { Client } from "@modelcontextprotocol/sdk/client";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { Tool } from "@modelcontextprotocol/sdk/types.js";
+import {
+  Prompt,
+  PromptMessage,
+  Tool,
+} from "@modelcontextprotocol/sdk/types.js";
+import { GoogleGenAI } from "@google/genai";
+
+config();
+
+const google = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 const mcp = new Client(
   {
@@ -81,6 +91,24 @@ async function main() {
         }
 
         break;
+      case "Prompts":
+        const promptName = await select({
+          message: "Select a prompt",
+          choices: prompts.map((prompt) => ({
+            name: prompt.name,
+            value: prompt.name,
+            description: prompt.description,
+          })),
+        });
+        const prompt = prompts.find((p) => p.name === promptName);
+        if (prompt == null) {
+          console.error("Prompt not found.");
+        } else {
+          await handlePrompt(prompt);
+        }
+        break;
+      // case "Query":
+      //   await handleQuery(tools);
     }
   }
 }
@@ -131,6 +159,45 @@ async function handleResource(uri: string) {
   console.log(
     JSON.stringify(JSON.parse(res.contents[0].text as string), null, 2)
   );
+}
+
+async function handlePrompt(prompt: Prompt) {
+  const args: Record<string, string> = {};
+  for (const arg of prompt.arguments ?? []) {
+    args[arg.name] = await input({
+      message: `Enter value for ${arg.name}:`,
+    });
+  }
+
+  const response = await mcp.getPrompt({
+    name: prompt.name,
+    arguments: args,
+  });
+
+  for (const message of response.messages) {
+    console.log(await handleServerMessagePrompt(message));
+  }
+}
+
+async function handleServerMessagePrompt(message: PromptMessage) {
+  if (message.content.type !== "text") return;
+
+  console.log(message.content.text);
+  const run = await confirm({
+    message: "Would you like to run the above prompt",
+    default: true,
+  });
+
+  if (!run) return;
+
+  const response = await google.models.generateContent({
+    model: "gemini-2.0-flash",
+    contents: message.content.text,
+  });
+  // console.log(response.candidates[0].content.parts[0].text);
+
+  const text = response?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  return text;
 }
 
 main();
