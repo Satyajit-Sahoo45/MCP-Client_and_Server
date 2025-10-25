@@ -3,6 +3,7 @@ import { confirm, input, select } from "@inquirer/prompts";
 import { Client } from "@modelcontextprotocol/sdk/client";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import {
+  CreateMessageRequestSchema,
   Prompt,
   PromptMessage,
   Tool,
@@ -36,6 +37,31 @@ async function main() {
       mcp.listResources(),
       mcp.listResourceTemplates(),
     ]);
+
+  // TO HANDLE 'SAMPLING' PART
+  // handle any request that follows specific schema
+  // here "CreateMessageRequestSchema" is used as an example
+  mcp.setRequestHandler(CreateMessageRequestSchema, async (request) => {
+    const texts: string[] = [];
+
+    for (const message of request.params.messages) {
+      const text = await handleServerMessagePrompt(message);
+
+      if (text != null) {
+        texts.push(text);
+      }
+    }
+
+    return {
+      role: "user",
+      model: "gemini-2.0-flash",
+      stopReason: "endTurn",
+      content: {
+        type: "text",
+        text: texts.join("\n"),
+      },
+    };
+  });
 
   console.log("You're Connected");
 
@@ -107,8 +133,8 @@ async function main() {
           await handlePrompt(prompt);
         }
         break;
-      // case "Query":
-      //   await handleQuery(tools);
+      case "Query":
+        await handleQuery(tools);
     }
   }
 }
@@ -198,6 +224,54 @@ async function handleServerMessagePrompt(message: PromptMessage) {
 
   const text = response?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
   return text;
+}
+
+async function handleQuery(tools: Tool[]) {
+  const query = await input({
+    message: "Enter your query:",
+  });
+
+  // console.log(tools[0].inputSchema, "====");
+
+  const funcTools = tools.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    parameters: {
+      type: tool.inputSchema.type,
+      properties: tool.inputSchema.properties,
+      required: tool.inputSchema.required,
+    },
+  }));
+
+  const response = await google.models.generateContent({
+    model: "gemini-2.0-flash",
+    contents: query,
+    config: {
+      tools: [
+        {
+          functionDeclarations: funcTools as [],
+        },
+      ],
+    },
+  });
+
+  const text = response?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  const functionCall =
+    response?.candidates?.[0]?.content?.parts?.[0]?.functionCall;
+
+  if (functionCall) {
+    const res = await mcp.callTool({
+      name: functionCall.name as string,
+      arguments: functionCall.args,
+    });
+
+    console.log((res.content as [{ text: string }])[0].text);
+  }
+
+  console.log(text || "No text generated");
+
+  // console.log(response?.candidates, "----");
+  // console.log(functionCall, "::::::");
 }
 
 main();
